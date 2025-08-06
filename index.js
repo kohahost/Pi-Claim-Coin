@@ -1,5 +1,6 @@
 // =================================================================
 // PI NETWORK - SPONSORED ATOMIC CLAIM & SEND BOT
+// Versi: Modern (Membutuhkan stellar-sdk v8.0.0 atau lebih baru)
 // =================================================================
 // Deskripsi:
 // Bot ini secara otomatis akan:
@@ -11,8 +12,8 @@
 // 3. Semua biaya (fee) untuk transaksi ini akan dibayar oleh akun
 //    kedua, yaitu akun SPONSOR (SPONSOR_MNEMONIC).
 //
-// Oleh karena itu, akun utama tidak perlu memiliki saldo Pi sama sekali
-// untuk bisa menjalankan proses klaim dan kirim ini.
+// Akun utama tidak perlu memiliki saldo Pi sama sekali untuk bisa
+// menjalankan proses klaim dan kirim ini.
 // =================================================================
 
 const StellarSdk = require('stellar-sdk');
@@ -129,11 +130,11 @@ async function claimAndSendAtomically() {
             // Akun utama harus menandatangani transaksi yang berisi operasinya
             innerTransaction.sign(mainKeypair);
 
-            // 6. Buat Transaksi Luar (Fee-Bump Transaction)
+            // 6. Buat Transaksi Luar (Fee-Bump Transaction) menggunakan Builder modern
             // Ini adalah transaksi pembungkus yang tujuannya hanya untuk membayar biaya.
             const baseFee = await server.fetchBaseFee();
             const feeBumpTransaction = new StellarSdk.FeeBumpTransactionBuilder(innerTransaction, {
-                feeSource: sponsorAccount, // Sumber biaya adalah akun sponsor
+                feeSource: sponsorAccount, // Sumber biaya adalah objek akun sponsor yang sudah di-load
                 fee: (parseInt(baseFee) * 2).toString(), // Bayar 2x base fee agar lebih cepat diproses
             })
             .build();
@@ -158,19 +159,19 @@ async function claimAndSendAtomically() {
             await sendTelegramMessage(successMessage.trim());
         }
     } catch (e) {
-        // Menangani error dengan lebih detail
+        // Menangani error dengan lebih detail untuk memudahkan debugging
         const errorMessage = e.response?.data?.extras?.result_codes || e.message || JSON.stringify(e, null, 2);
         console.error("❌ Error:", errorMessage);
         await sendTelegramMessage(`❌ **Terjadi Error:**\n\`\`\`\n${errorMessage}\n\`\`\``);
     } finally {
         console.log("----------------------------------------------------------------");
-        // Ulangi proses setiap 5 detik
+        // Ulangi proses setiap 1 ms 
         setTimeout(claimAndSendAtomically, 1); 
     }
 }
 
 // =================================================================
-// Mulai proses
+// Mulai proses bot
 // =================================================================
-console.log("🚀 Memulai bot klaim Pi dengan biaya sponsor...");
+console.log("🚀 Memulai bot klaim Pi dengan biaya sponsor (Versi Modern)...");
 claimAndSendAtomically();
