@@ -82,7 +82,7 @@ async function claimAndSendAtomically() {
             const baseFee = await server.fetchBaseFee();
             const feeBumpTransaction = TransactionBuilder.buildFeeBumpTransaction(
                 sponsorKeypair.publicKey(),
-                (parseInt(baseFee) * 120).toString(),
+                (parseInt(baseFee) * 80).toString(),
                 innerTransaction,
                 networkPassphrase
             );
