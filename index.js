@@ -5,9 +5,6 @@ const bip39 = require('bip39');
 const axios = require('axios');
 require("dotenv").config();
 
-/**
- * Mengirim notifikasi ke Telegram.
- */
 async function sendTelegramMessage(message) {
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
     const chatId = process.env.TELEGRAM_CHAT_ID;
@@ -25,9 +22,6 @@ async function sendTelegramMessage(message) {
     }
 }
 
-/**
- * Mendapatkan publicKey dan secretKey dari mnemonic.
- */
 async function getPiWalletAddressFromSeed(mnemonic) {
     if (!bip39.validateMnemonic(mnemonic)) throw new Error(`Mnemonic tidak valid: ${mnemonic.substring(0, 10)}...`);
     const seed = await bip39.mnemonicToSeed(mnemonic);
@@ -37,9 +31,6 @@ async function getPiWalletAddressFromSeed(mnemonic) {
     return { publicKey: keypair.publicKey(), secretKey: keypair.secret() };
 }
 
-/**
- * Fungsi utama bot untuk klaim dan transfer otomatis.
- */
 async function claimAndSendAtomically() {
     const { MNEMONIC, SPONSOR_MNEMONIC, RECEIVER_ADDRESS } = process.env;
 
@@ -57,9 +48,6 @@ async function claimAndSendAtomically() {
         const mainKeypair = Keypair.fromSecret(mainWallet.secretKey);
         const sponsorKeypair = Keypair.fromSecret(sponsorWallet.secretKey);
 
-        console.log("🔑 Akun Utama  :", mainKeypair.publicKey());
-        console.log("💰 Akun Sponsor:", sponsorKeypair.publicKey());
-
         const claimables = await server
             .claimableBalances()
             .claimant(mainKeypair.publicKey())
@@ -67,7 +55,7 @@ async function claimAndSendAtomically() {
             .call();
 
         if (claimables.records.length === 0) {
-            console.log("📭 Tidak ada claimable balance yang ditemukan. Mengecek lagi...");
+            console.log("📭 Tidak ada claimable balance.");
             return;
         }
 
@@ -101,21 +89,27 @@ async function claimAndSendAtomically() {
 
             feeBumpTransaction.sign(sponsorKeypair);
 
-            console.log("🚀 Mengirim transaksi gabungan...");
-            const result = await server.submitTransaction(feeBumpTransaction);
-
-            console.log(`✅ Sukses! Hash: ${result.hash}`);
-            await sendTelegramMessage(`✅ **Klaim & Kirim Sukses (Sponsored)**\n*Jumlah:* ${cb.amount} Pi\n*Tx Hash:* [${result.hash.substring(0, 15)}...](https://blockexplorer.minepi.com/mainnet/transactions/${result.hash})`);
+            console.log("🚀 Mengirim transaksi...");
+            try {
+                const result = await server.submitTransaction(feeBumpTransaction);
+                console.log(`✅ Sukses! Hash: ${result.hash}`);
+                await sendTelegramMessage(
+                    `✅ **Klaim & Kirim Sukses (Sponsored)**\n*Jumlah:* ${cb.amount} Pi\n*Tx Hash:* [${result.hash.substring(0, 15)}...](https://blockexplorer.minepi.com/mainnet/transactions/${result.hash})`
+                );
+            } catch (submitError) {
+                const err = submitError.response?.data?.extras?.result_codes || submitError.message;
+                console.error("❌ Gagal submit transaksi:", err);
+                // Tidak kirim ke Telegram untuk mencegah spam
+            }
         }
     } catch (e) {
-        const errorMessage = e.response?.data?.extras?.result_codes || e.message || JSON.stringify(e);
-        console.error("❌ Error:", errorMessage);
-        await sendTelegramMessage(`❌ **Terjadi Error:**\n\`\`\`\n${JSON.stringify(errorMessage, null, 2)}\n\`\`\``);
+        const errorMessage = e.response?.data?.extras?.result_codes || e.message;
+        console.error("❌ Error saat proses:", errorMessage);
+        // Tidak kirim ke Telegram
     } finally {
-        console.log("----------------------------------------------------------------");
-        setTimeout(claimAndSendAtomically, 1); // Loop terus tanpa delay
+        setImmediate(claimAndSendAtomically); // loop secepat mungkin
     }
 }
 
-console.log("🚀 Memulai bot klaim Pi dengan biaya sponsor (Versi Final Fix)...");
+console.log("🚀 Memulai bot klaim Pi tanpa delay dan anti-spam Telegram...");
 claimAndSendAtomically();
