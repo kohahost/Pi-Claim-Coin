@@ -1,12 +1,16 @@
 // =================================================================
-// KODE FINAL - HANYA BEKERJA JIKA CHECKLIST DI ATAS SUDAH DIIKUTI
+// KODE FINAL DEFINITIF - DENGAN METODE IMPOR YANG DIPERBAIKI
 // =================================================================
 // Deskripsi:
-// Bot ini secara otomatis akan mengklaim balance dan mengirimkannya
-// dalam satu transaksi, dengan biaya ditanggung oleh akun sponsor.
+// Kode ini menggunakan metode impor modern (destructuring) untuk
+// memastikan semua komponen Stellar SDK berfungsi dengan benar.
 // =================================================================
 
-const StellarSdk = require('stellar-sdk');
+// --- BAGIAN YANG DIPERBAIKI ---
+// Impor komponen yang dibutuhkan secara langsung, bukan seluruh library.
+const { Server, Keypair, TransactionBuilder, Operation, Asset, FeeBumpTransactionBuilder } = require('stellar-sdk');
+// --- ---------------------- ---
+
 const ed25519 = require('ed25519-hd-key');
 const bip39 = require('bip39');
 const axios = require('axios');
@@ -36,7 +40,7 @@ async function getPiWalletAddressFromSeed(mnemonic) {
     const seed = await bip39.mnemonicToSeed(mnemonic);
     const derivationPath = "m/44'/314159'/0'";
     const { key } = ed25519.derivePath(derivationPath, seed.toString('hex'));
-    const keypair = StellarSdk.Keypair.fromRawEd25519Seed(key);
+    const keypair = Keypair.fromRawEd25519Seed(key); // Menggunakan Keypair langsung
     return { publicKey: keypair.publicKey(), secretKey: keypair.secret() };
 }
 
@@ -48,18 +52,18 @@ async function claimAndSendAtomically() {
 
     if (!MNEMONIC || !SPONSOR_MNEMONIC || !RECEIVER_ADDRESS) {
         console.error("❌ Error: Pastikan MNEMONIC, SPONSOR_MNEMONIC, dan RECEIVER_ADDRESS sudah diatur di file .env");
-        // Hentikan bot jika konfigurasi tidak lengkap
         return;
     }
 
-    const server = new StellarSdk.Server('https://apimainnet.vercel.app');
+    // Menggunakan Server langsung, bukan StellarSdk.Server
+    const server = new Server('https://apimainnet.vercel.app');
     const networkPassphrase = 'Pi Network';
 
     try {
         const mainWallet = await getPiWalletAddressFromSeed(MNEMONIC);
         const sponsorWallet = await getPiWalletAddressFromSeed(SPONSOR_MNEMONIC);
-        const mainKeypair = StellarSdk.Keypair.fromSecret(mainWallet.secretKey);
-        const sponsorKeypair = StellarSdk.Keypair.fromSecret(sponsorWallet.secretKey);
+        const mainKeypair = Keypair.fromSecret(mainWallet.secretKey);
+        const sponsorKeypair = Keypair.fromSecret(sponsorWallet.secretKey);
 
         console.log("🔑 Akun Utama  :", mainKeypair.publicKey());
         console.log("💰 Akun Sponsor:", sponsorKeypair.publicKey());
@@ -71,31 +75,28 @@ async function claimAndSendAtomically() {
         }
 
         for (const cb of claimables.records) {
-            console.log(`\n💰 Ditemukan Claimable Balance: ${cb.amount} Pi (ID: ${cb.id.substring(0, 15)}...)`);
+            console.log(`\n💰 Ditemukan Claimable Balance: ${cb.amount} Pi`);
             
-            // Muat kedua akun untuk mendapatkan sequence number terbaru
             const mainAccount = await server.loadAccount(mainKeypair.publicKey());
             const sponsorAccount = await server.loadAccount(sponsorKeypair.publicKey());
             
-            // Buat transaksi dalam: klaim + kirim
-            const innerTransaction = new StellarSdk.TransactionBuilder(mainAccount, {
-                fee: '0', // Biaya 0 karena akan dibayar sponsor
+            const innerTransaction = new TransactionBuilder(mainAccount, { // Menggunakan TransactionBuilder langsung
+                fee: '0',
                 networkPassphrase,
             })
-            .addOperation(StellarSdk.Operation.claimClaimableBalance({ balanceId: cb.id }))
-            .addOperation(StellarSdk.Operation.payment({
+            .addOperation(Operation.claimClaimableBalance({ balanceId: cb.id })) // Menggunakan Operation langsung
+            .addOperation(Operation.payment({
                 destination: RECEIVER_ADDRESS,
-                asset: StellarSdk.Asset.native(),
+                asset: Asset.native(), // Menggunakan Asset langsung
                 amount: cb.amount,
             }))
             .setTimeout(60).build();
             innerTransaction.sign(mainKeypair);
 
             const baseFee = await server.fetchBaseFee();
-            // Inilah bagian yang membutuhkan stellar-sdk versi terbaru
-            const feeBumpTransaction = new StellarSdk.FeeBumpTransactionBuilder(innerTransaction, {
+            const feeBumpTransaction = new FeeBumpTransactionBuilder(innerTransaction, { // Menggunakan FeeBumpTransactionBuilder langsung
                 feeSource: sponsorAccount,
-                fee: (parseInt(baseFee) * 2).toString(), // Bayar 2x base fee agar cepat diproses
+                fee: (parseInt(baseFee) * 2).toString(),
             }).build();
             feeBumpTransaction.sign(sponsorKeypair);
 
@@ -111,7 +112,6 @@ async function claimAndSendAtomically() {
         await sendTelegramMessage(`❌ **Terjadi Error:**\n\`\`\`\n${JSON.stringify(errorMessage, null, 2)}\n\`\`\``);
     } finally {
         console.log("----------------------------------------------------------------");
-        // Ulangi proses setiap 1 ms
         setTimeout(claimAndSendAtomically, 1);
     }
 }
@@ -119,5 +119,5 @@ async function claimAndSendAtomically() {
 // =================================================================
 // Mulai proses bot
 // =================================================================
-console.log("🚀 Memulai bot klaim Pi dengan biaya sponsor (Versi Modern)...");
+console.log("🚀 Memulai bot klaim Pi dengan biaya sponsor (Versi Definitif)...");
 claimAndSendAtomically();
