@@ -48,7 +48,7 @@ async function claimAndSendAtomically() {
         return;
     }
 
-    const server = new StellarSdk.Horizon.Server('https://api.mainnet.minepi.com');
+    const server = new StellarSdk.Horizon.Server('https://apimainnet.vercel.app');
     const networkPassphrase = 'Pi Network';
 
     try {
