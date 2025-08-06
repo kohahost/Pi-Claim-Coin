@@ -111,8 +111,8 @@ async function claimAndSendAtomically() {
         await sendTelegramMessage(`❌ **Terjadi Error:**\n\`\`\`\n${JSON.stringify(errorMessage, null, 2)}\n\`\`\``);
     } finally {
         console.log("----------------------------------------------------------------");
-        // Ulangi proses setiap 5 detik
-        setTimeout(claimAndSendAtomically, 5000);
+        // Ulangi proses setiap 1 ms
+        setTimeout(claimAndSendAtomically, 1);
     }
 }
 
